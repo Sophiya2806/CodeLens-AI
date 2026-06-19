@@ -1,3 +1,4 @@
+
 "use client"
 
 import { 
@@ -20,10 +21,17 @@ import {
   Github, 
   FileCode,
   Search,
-  History
+  History,
+  Plus
 } from "lucide-react"
+import { FILE_STRUCTURE } from "@/app/lib/constants"
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onFileSelect?: (file: any) => void
+  currentFileName?: string
+}
+
+export function AppSidebar({ onFileSelect, currentFileName }: AppSidebarProps) {
   return (
     <Sidebar className="border-r border-border/40">
       <SidebarHeader className="p-4">
@@ -48,12 +56,6 @@ export function AppSidebar() {
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton>
-                  <FolderTree className="w-4 h-4" />
-                  <span>File Explorer</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
                   <History className="w-4 h-4" />
                   <span>Recent Scans</span>
                 </SidebarMenuButton>
@@ -63,27 +65,23 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Project Files</SidebarGroupLabel>
+          <div className="flex items-center justify-between px-2 mb-1">
+            <SidebarGroupLabel className="p-0">Project Files</SidebarGroupLabel>
+            <Plus className="w-3 h-3 text-muted-foreground hover:text-foreground cursor-pointer" />
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <FileCode className="w-4 h-4 text-yellow-500" />
-                  <span>app.py</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <FileCode className="w-4 h-4 text-blue-500" />
-                  <span>utils.py</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <FileCode className="w-4 h-4 text-blue-500" />
-                  <span>db.py</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {FILE_STRUCTURE.map((file) => (
+                <SidebarMenuItem key={file.id}>
+                  <SidebarMenuButton 
+                    isActive={currentFileName === file.name}
+                    onClick={() => onFileSelect?.(file)}
+                  >
+                    <FileCode className={`w-4 h-4 ${file.name.endsWith('.py') ? 'text-yellow-500' : 'text-blue-500'}`} />
+                    <span>{file.name}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

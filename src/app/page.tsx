@@ -1,6 +1,7 @@
+
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { StatsDashboard } from "@/components/dashboard/stats-dashboard"
@@ -18,9 +19,11 @@ import {
   ShieldCheck,
   AlertTriangle,
   FileText,
-  LayoutDashboard
+  LayoutDashboard,
+  Edit3,
+  Search
 } from "lucide-react"
-import { MOCK_CODE } from "@/app/lib/constants"
+import { MOCK_CODE, FILE_STRUCTURE } from "@/app/lib/constants"
 import { annotateCode } from "@/ai/flows/inline-ai-code-annotations"
 import { authSecurityAudit } from "@/ai/flows/auth-security-audit-flow"
 import { codeVulnerabilityReport } from "@/ai/flows/code-vulnerability-report"
@@ -31,21 +34,37 @@ import { Badge } from "@/components/ui/badge"
 export default function CodeLensApp() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [activeTab, setActiveTab] = useState("editor")
+  const [editMode, setEditMode] = useState(true)
+  const [code, setCode] = useState(MOCK_CODE)
+  const [fileName, setFileName] = useState("app.py")
+  
   const [annotations, setAnnotations] = useState<any[]>([])
-  const [securityScore, setSecurityScore] = useState(64)
+  const [securityScore, setSecurityScore] = useState(0)
   const [vulnerabilitySummary, setVulnerabilitySummary] = useState<string>("")
   const [authAudit, setAuthAudit] = useState<any>(null)
   const { toast } = useToast()
 
   const handleRunAnalysis = async () => {
+    if (!code.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Empty Code",
+        description: "Please paste or write some code to analyze.",
+      })
+      return
+    }
+
     setIsAnalyzing(true)
+    setEditMode(false) // Switch to review mode to see results
     setActiveTab("editor")
     
     try {
+      const language = fileName.endsWith('.py') ? 'python' : 'javascript'
+      
       const [annotated, audit, report] = await Promise.all([
-        annotateCode({ code: MOCK_CODE, fileName: 'app.py', language: 'python' }),
-        authSecurityAudit({ codeSnippet: MOCK_CODE }),
-        codeVulnerabilityReport({ codeContent: MOCK_CODE, language: 'python' })
+        annotateCode({ code, fileName, language }),
+        authSecurityAudit({ codeSnippet: code }),
+        codeVulnerabilityReport({ codeContent: code, language, fileName })
       ])
 
       setAnnotations(annotated.annotations)
@@ -55,17 +74,30 @@ export default function CodeLensApp() {
       
       toast({
         title: "Analysis Complete",
-        description: `Identified ${annotated.annotations.length} potential issues in app.py`,
+        description: `Identified ${annotated.annotations.length} potential issues in ${fileName}`,
       })
     } catch (error) {
+      console.error(error)
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "An error occurred while processing the code.",
+        description: "An error occurred while processing the code. Please try again.",
       })
     } finally {
       setIsAnalyzing(false)
     }
+  }
+
+  const handleFileSelect = (file: any) => {
+    setFileName(file.name)
+    setCode(file.content)
+    setAnnotations([])
+    setAuthAudit(null)
+    setEditMode(true)
+    toast({
+      title: "File Loaded",
+      description: `Switched to ${file.name}`,
+    })
   }
 
   const handleExportPDF = () => {
@@ -80,36 +112,41 @@ export default function CodeLensApp() {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar />
+      <AppSidebar onFileSelect={handleFileSelect} currentFileName={fileName} />
       <SidebarInset className="bg-background flex flex-col h-screen overflow-hidden">
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-card/30 backdrop-blur-md sticky top-0 z-40">
           <div className="flex items-center gap-4">
             <SidebarTrigger />
-            <h1 className="font-headline font-semibold text-lg hidden md:block">Project Alpha / app.py</h1>
+            <div className="flex flex-col">
+               <h1 className="font-headline font-semibold text-lg hidden md:block leading-none mb-1">Project Alpha</h1>
+               <span className="text-xs text-muted-foreground flex items-center gap-1">
+                 <FileText className="w-3 h-3" /> {fileName}
+               </span>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-muted/50 rounded-lg p-1 mr-2 border border-border/40">
               <Github className="w-4 h-4 ml-2 text-muted-foreground" />
               <Input 
-                className="border-none bg-transparent focus-visible:ring-0 text-xs w-48" 
+                className="border-none bg-transparent focus-visible:ring-0 text-xs w-48 h-8" 
                 placeholder="Repository URL..." 
               />
             </div>
             <Button 
               size="sm" 
               variant="default" 
-              className="gap-2 font-medium"
+              className="gap-2 font-medium bg-primary hover:bg-primary/90"
               onClick={handleRunAnalysis}
               disabled={isAnalyzing}
             >
               {isAnalyzing ? <Sparkles className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               {isAnalyzing ? "Analyzing..." : "Run Analysis"}
             </Button>
-            <Button size="sm" variant="outline" className="gap-2" onClick={handleExportPDF}>
+            <Button size="sm" variant="outline" className="gap-2 h-9" onClick={handleExportPDF}>
               <Download className="w-4 h-4" />
-              Export PDF
+              Export
             </Button>
           </div>
         </header>
@@ -125,7 +162,7 @@ export default function CodeLensApp() {
                 </TabsTrigger>
                 <TabsTrigger value="editor" className="gap-2">
                   <Terminal className="w-4 h-4" />
-                  Code Review
+                  Code Editor
                 </TabsTrigger>
                 <TabsTrigger value="security" className="gap-2">
                   <ShieldCheck className="w-4 h-4" />
@@ -134,8 +171,17 @@ export default function CodeLensApp() {
               </TabsList>
               
               <div className="flex gap-2">
+                 <Button 
+                   variant={editMode ? "secondary" : "ghost"} 
+                   size="sm" 
+                   className="h-8 gap-1"
+                   onClick={() => setEditMode(!editMode)}
+                 >
+                   {editMode ? <ShieldCheck className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                   {editMode ? "Review Mode" : "Edit Code"}
+                 </Button>
                  <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 px-3 py-1">
-                   v1.2.4 (Latest Scan)
+                   Ready for Scan
                  </Badge>
               </div>
             </div>
@@ -154,15 +200,26 @@ export default function CodeLensApp() {
                     </p>
                   </div>
                 )}
+                {!vulnerabilitySummary && (
+                  <div className="mt-8 p-12 text-center bg-card/30 border border-dashed border-border/50 rounded-xl">
+                    <Terminal className="w-12 h-12 text-muted/30 mx-auto mb-4" />
+                    <h3 className="text-xl font-headline font-semibold mb-2">No Analysis Results</h3>
+                    <p className="text-muted-foreground max-w-sm mx-auto">
+                      Switch to the Editor tab and click "Run Analysis" to get AI insights on your code.
+                    </p>
+                  </div>
+                )}
               </ScrollArea>
             </TabsContent>
 
             <TabsContent value="editor" className="mt-0 flex-1 flex gap-6 overflow-hidden">
               <div className="flex-1 min-w-0">
                 <CodeViewer 
-                  code={MOCK_CODE} 
+                  code={code} 
+                  setCode={setCode}
                   annotations={annotations} 
                   isAnalyzing={isAnalyzing} 
+                  editMode={editMode}
                 />
               </div>
               
@@ -177,7 +234,7 @@ export default function CodeLensApp() {
                     <div className="space-y-3">
                       {annotations.length > 0 ? (
                         annotations.map((a, i) => (
-                          <div key={i} className="p-3 bg-muted/30 rounded-lg border border-border/20">
+                          <div key={i} className="p-3 bg-muted/30 rounded-lg border border-border/20 hover:border-primary/30 transition-colors cursor-default">
                             <div className="flex items-center gap-2 mb-1">
                                <Badge variant={a.severity === 'CRITICAL' ? 'destructive' : 'secondary'} className="text-[10px] uppercase">
                                  {a.severity}
@@ -185,11 +242,14 @@ export default function CodeLensApp() {
                                <span className="text-[10px] text-muted-foreground">Line {a.lineNumber}</span>
                             </div>
                             <p className="text-xs font-medium mb-1">{a.description}</p>
-                            <p className="text-[10px] text-muted-foreground italic">{a.recommendation.substring(0, 60)}...</p>
+                            <p className="text-[10px] text-muted-foreground italic">{a.recommendation.substring(0, 80)}...</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-muted-foreground py-4 text-center">Run analysis to see findings</p>
+                        <div className="py-12 text-center">
+                          <Search className="w-8 h-8 text-muted/20 mx-auto mb-2" />
+                          <p className="text-xs text-muted-foreground">Run analysis to see findings</p>
+                        </div>
                       )}
                     </div>
                   </ScrollArea>
@@ -203,15 +263,15 @@ export default function CodeLensApp() {
                   <div className="space-y-2 text-[11px]">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Syntax Check</span>
-                      <span className="text-green-500 font-bold">Passed</span>
+                      <span className={`${code ? 'text-green-500' : 'text-muted/40'} font-bold`}>{code ? 'Passed' : 'Pending'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Complexity Index</span>
-                      <span className="text-orange-500 font-bold">High (12.4)</span>
+                      <span className="text-muted-foreground">Language Detected</span>
+                      <span className="text-primary font-bold uppercase">{fileName.split('.').pop()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Memory Leak Risk</span>
-                      <span className="text-green-500 font-bold">None Detected</span>
+                      <span className="text-muted-foreground">Lines of Code</span>
+                      <span className="text-foreground font-bold">{code.split('\n').length}</span>
                     </div>
                   </div>
                 </div>
@@ -248,11 +308,13 @@ export default function CodeLensApp() {
                         Identified Vulnerabilities
                       </h3>
                       <div className="grid gap-4">
-                        {authAudit.vulnerabilities.map((v: any, i: number) => (
-                          <div key={i} className="p-6 bg-card/50 border-l-4 border-l-red-500 border border-border/50 rounded-r-xl">
+                        {authAudit.vulnerabilities.length > 0 ? authAudit.vulnerabilities.map((v: any, i: number) => (
+                          <div key={i} className={`p-6 bg-card/50 border-l-4 border border-border/50 rounded-r-xl ${
+                            v.severity === 'CRITICAL' ? 'border-l-red-500' : 'border-l-orange-500'
+                          }`}>
                             <div className="flex items-center justify-between mb-2">
                                <h4 className="font-bold text-lg">{v.name}</h4>
-                               <Badge variant="destructive">{v.severity}</Badge>
+                               <Badge variant={v.severity === 'CRITICAL' ? 'destructive' : 'secondary'}>{v.severity}</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mb-4">{v.description}</p>
                             <div className="bg-background/40 p-4 rounded-lg">
@@ -260,7 +322,9 @@ export default function CodeLensApp() {
                               <p className="text-xs font-code">{v.remediation}</p>
                             </div>
                           </div>
-                        ))}
+                        )) : (
+                          <p className="text-muted-foreground italic">No specific vulnerabilities identified in the current audit.</p>
+                        )}
                       </div>
                     </div>
 
@@ -286,7 +350,9 @@ export default function CodeLensApp() {
                       <h3 className="text-xl font-headline font-bold">No Audit Data</h3>
                       <p className="text-muted-foreground max-w-sm">Run a full security scan to audit authentication mechanisms and session management.</p>
                     </div>
-                    <Button onClick={handleRunAnalysis}>Start Security Audit</Button>
+                    <Button onClick={handleRunAnalysis} disabled={isAnalyzing}>
+                       {isAnalyzing ? "Processing..." : "Start Security Audit"}
+                    </Button>
                   </div>
                 )}
               </ScrollArea>
