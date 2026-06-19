@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {withRetry} from '@/lib/retry';
 
 const AuthSecurityAuditInputSchema = z.object({
   codeSnippet: z.string().describe('The code snippet related to authentication mechanisms (e.g., JWT handling, session management, OAuth flows) to be audited.'),
@@ -80,7 +81,7 @@ const authSecurityAuditFlow = ai.defineFlow(
     outputSchema: AuthSecurityAuditOutputSchema,
   },
   async (input) => {
-    const {output} = await authSecurityAuditPrompt(input);
+    const {output} = await withRetry(() => authSecurityAuditPrompt(input));
     return output!;
   }
 );

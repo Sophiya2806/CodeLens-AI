@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -13,7 +12,6 @@ import {
   Play, 
   Download, 
   Github, 
-  Upload, 
   Terminal, 
   Sparkles,
   ShieldCheck,
@@ -21,9 +19,10 @@ import {
   FileText,
   LayoutDashboard,
   Edit3,
-  Search
+  Search,
+  CheckCircle2
 } from "lucide-react"
-import { MOCK_CODE, FILE_STRUCTURE } from "@/app/lib/constants"
+import { MOCK_CODE } from "@/app/lib/constants"
 import { annotateCode } from "@/ai/flows/inline-ai-code-annotations"
 import { authSecurityAudit } from "@/ai/flows/auth-security-audit-flow"
 import { codeVulnerabilityReport } from "@/ai/flows/code-vulnerability-report"
@@ -55,33 +54,42 @@ export default function CodeLensApp() {
     }
 
     setIsAnalyzing(true)
-    setEditMode(false) // Switch to review mode to see results
+    setEditMode(false) 
     setActiveTab("editor")
     
     try {
       const language = fileName.endsWith('.py') ? 'python' : 'javascript'
       
-      const [annotated, audit, report] = await Promise.all([
-        annotateCode({ code, fileName, language }),
-        authSecurityAudit({ codeSnippet: code }),
-        codeVulnerabilityReport({ codeContent: code, language, fileName })
-      ])
+      // We run these sequentially to avoid hitting rate limits or high-demand peaks simultaneously
+      toast({
+        title: "Analysis Started",
+        description: "Starting deep code inspection...",
+      })
 
+      const annotated = await annotateCode({ code, fileName, language })
       setAnnotations(annotated.annotations)
-      setAuthAudit(audit)
+      
+      const report = await codeVulnerabilityReport({ codeContent: code, language, fileName })
       setSecurityScore(report.securityScore)
       setVulnerabilitySummary(report.summary)
+
+      const audit = await authSecurityAudit({ codeSnippet: code })
+      setAuthAudit(audit)
       
       toast({
         title: "Analysis Complete",
         description: `Identified ${annotated.annotations.length} potential issues in ${fileName}`,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
+      const isUnavailable = error?.message?.includes('503') || error?.message?.includes('Unavailable');
+      
       toast({
         variant: "destructive",
-        title: "Analysis Failed",
-        description: "An error occurred while processing the code. Please try again.",
+        title: isUnavailable ? "AI Service Busy" : "Analysis Failed",
+        description: isUnavailable 
+          ? "The AI model is currently under high load. We've tried retrying, but please wait a moment before trying again."
+          : "An error occurred while processing the code. Please try again.",
       })
     } finally {
       setIsAnalyzing(false)
@@ -177,11 +185,11 @@ export default function CodeLensApp() {
                    className="h-8 gap-1"
                    onClick={() => setEditMode(!editMode)}
                  >
-                   {editMode ? <ShieldCheck className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
-                   {editMode ? "Review Mode" : "Edit Code"}
+                   {editMode ? <CheckCircle2 className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                   {editMode ? "Switch to Review" : "Edit Code"}
                  </Button>
                  <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 px-3 py-1">
-                   Ready for Scan
+                   {isAnalyzing ? "Analyzing..." : "Ready for Scan"}
                  </Badge>
               </div>
             </div>

@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {withRetry} from '@/lib/retry';
 
 const AnnotateCodeInputSchema = z.object({
   code: z.string().describe('The source code to be analyzed.'),
@@ -59,7 +60,7 @@ const annotateCodeFlow = ai.defineFlow(
     outputSchema: AnnotateCodeOutputSchema,
   },
   async (input) => {
-    const {output} = await annotateCodePrompt(input);
+    const {output} = await withRetry(() => annotateCodePrompt(input));
     return output!;
   }
 );
