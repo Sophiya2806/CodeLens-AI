@@ -13,15 +13,26 @@ AI-powered Code Review & Security Analysis Platform
 ## 🧠 Tech Stack
 Next.js, TypeScript, Tailwind CSS, Python, AST, Gemini AI
 
-## 📸 Screenshots
-(Add UI images here)
+## Available
+https://code-lens-a5c5pjosp-sophiya.vercel.app/
 
-## ⚙️ Setup
-npm install
-npm run dev
-
-## 🔐 Environment Variables
-See .env.example
 
 ## 📊 Architecture
-Frontend → API → AST Engine → AI Layer → Report Generator
+Frontend (Next.js + Tailwind)
+        ↓
+API Layer (Next.js API routes / FastAPI optional)
+        ↓
+Analysis Orchestrator Engine (Python + Node bridge)
+        ↓
+ ┌────────────────────────────────────┐
+ │ 1. AST Static Analyzer (Python)     │
+ │ 2. Security Rules Engine            │
+ │ 3. LLM Reasoning Engine (Gemini)    │
+ │ 4. Auth Security Auditor Module     │
+ └────────────────────────────────────┘
+        ↓
+Unified Findings Engine
+        ↓
+Risk Scoring + Report Generator
+        ↓
+UI Dashboard + PDF Export
